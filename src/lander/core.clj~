@@ -1,0 +1,17 @@
+(ns lander.core
+  (:gen-class))
+
+;; Accelerations in m/s.
+(def gravity 9.8)
+(def vertical-thrust 20)
+(def horizontal-thrust 4)
+
+(defn final-speed
+  "Calculates a body's final speed, given an initial speed and a constant acceleration which is applied for time."
+  [initial-speed acceleration time]
+  (+ initial-speed (* acceleration time)))
+
+(defn -main
+  "I don't do a whole lot ... yet."
+  [& args]
+  (println "Hello, World!"))
