@@ -89,6 +89,10 @@
                      (render g)))
              (.setPreferredSize (Dimension. 640 480))))
 
+(defn thrustKey?
+  [event]
+  (= (.getKeyCode event) KeyEvent/VK_SPACE))
+
 (defn create-gui
   []
   (doto (JFrame. "Lander")
@@ -96,11 +100,11 @@
     (.pack)
     (.setVisible true)
     (.addKeyListener (proxy [KeyAdapter] []
-                       (keyPressed [e]
-                         (if (= (.getKeyCode e) KeyEvent/VK_SPACE)
-                           (swap! state assoc-in [:lander :thrust] true)))
-                       (keyReleased [e]
-                         (if (= (.getKeyCode e) KeyEvent/VK_SPACE)
+                       (keyPressed [event]
+                         (if thrustKey? event)
+                           (swap! state assoc-in [:lander :thrust] true))
+                       (keyReleased [event]
+                         (if (thrustKey? event)
                            (swap! state assoc-in [:lander :thrust] false)))))))
 
 (defn start-loop []
