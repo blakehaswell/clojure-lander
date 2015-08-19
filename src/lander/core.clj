@@ -28,6 +28,12 @@
   [initial-speed acceleration time]
   (+ initial-speed (* acceleration time)))
 
+(defn update-state []
+  (let [current-state @state
+        y (:y (:lander current-state))]
+    (swap! state assoc-in [:lander :y]
+           (+ 1 y))))
+
 (defn render-lander [g lander]
   (doto g
     (.fillRect (:x lander) (:y lander) 100 100)))
@@ -49,7 +55,8 @@
 
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
-    (println start-time)
+    (update-state)
+    (.repaint panel)
     (Thread/sleep (- (+ time-step start-time)
                      (System/currentTimeMillis)))
     (recur)))
