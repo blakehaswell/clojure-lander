@@ -50,7 +50,7 @@
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
     (println start-time)
-    (Thread/sleep (- (+ 500 start-time)
+    (Thread/sleep (- (+ time-step start-time)
                      (System/currentTimeMillis)))
     (recur)))
 
