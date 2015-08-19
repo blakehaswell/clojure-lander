@@ -18,9 +18,9 @@
                            :y 50
                            :thrust true
                            :fuel 100 ; litres
-                           :rotation 20
-                           :vertical-speed -10
-                           :horizontal-speed 2.4}}))
+                           :rotation 0
+                           :vertical-speed 0
+                           :horizontal-speed 0}}))
 
 (defn final-speed
   "Calculates a body's final speed (m/s), given an initial speed (m/s)
@@ -28,11 +28,28 @@
   [initial-speed acceleration time]
   (+ initial-speed (* acceleration time)))
 
+(defn update-speed
+  [state]
+  ;; Apply gravity to the craft.
+  (update-in state
+             [:lander :vertical-speed]
+             (fn [vertical-speed] (final-speed vertical-speed
+                                               (* gravity -1)
+                                               (/ time-step 1000)))))
+
+(defn update-position
+  [state]
+  (update-in state
+             [:lander :y]
+             (fn [y] (- y
+                        (* (:vertical-speed (:lander state))
+                           (/ time-step 1000))))))
+
 (defn update-state []
-  (let [current-state @state
-        y (:y (:lander current-state))]
-    (swap! state assoc-in [:lander :y]
-           (+ 1 y))))
+  (swap! state (fn [s]
+                 (-> s
+                     update-speed
+                     update-position))))
 
 (defn render-lander [g lander]
   (doto g
