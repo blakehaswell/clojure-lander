@@ -1,7 +1,8 @@
 (ns lander.core
   (:gen-class)
   (:import (javax.swing JFrame JPanel)
-           (java.awt Dimension Rectangle)))
+           (java.awt Dimension Rectangle)
+           (java.awt.event KeyAdapter KeyEvent)))
 
 ;; This is how often the world is updated and rendered. We'll be aiming for 60
 ;; frames per second (approx 16ms time-step).
@@ -14,9 +15,9 @@
 ;; Rotation speed defined in degrees per second.
 (def rotation-speed 90)
 
-(def state (atom {:lander {:x 50 ; x and y coordinates defined in meters.
-                           :y 50
-                           :thrust true
+(def state (atom {:lander {:x 0 ; x and y coordinates defined in meters.
+                           :y 0
+                           :thrust false
                            :fuel 100 ; litres
                            :rotation 0
                            :vertical-speed 0
@@ -28,14 +29,30 @@
   [initial-speed acceleration time]
   (+ initial-speed (* acceleration time)))
 
-(defn update-speed
+(defn apply-gravity
   [state]
-  ;; Apply gravity to the craft.
   (update-in state
              [:lander :vertical-speed]
              (fn [vertical-speed] (final-speed vertical-speed
                                                (* gravity -1)
                                                (/ time-step 1000)))))
+
+(defn apply-thrust
+  [state]
+  (if (:thrust (:lander state))
+    (update-in state
+               [:lander :vertical-speed]
+               (fn [vertical-speed]
+                 (final-speed vertical-speed
+                              thrust-acceleration
+                              (/ time-step 1000))))
+    state))
+
+(defn update-speed
+  [state]
+  (-> state
+   apply-gravity
+   apply-thrust))
 
 (defn update-position
   [state]
@@ -51,16 +68,25 @@
                      update-speed
                      update-position))))
 
+;; UI ;;
+
+(defn pixels
+  "Converts meters to pixels."
+  [meters]
+  (* meters 10))
+
 (defn render-lander [g lander]
   (doto g
-    (.fillRect (:x lander) (:y lander) 100 100)))
+    (.fillRect (pixels (:x lander)) (pixels (:y lander)) 100 100)))
 
 (defn render [g]
   (let [state @state]
     (render-lander g (:lander state))))
 
 (def panel (doto (proxy [JPanel] []
-                   (paintComponent [g] (render g)))
+                   (paintComponent [g]
+                     (proxy-super paintComponent g)
+                     (render g)))
              (.setPreferredSize (Dimension. 640 480))))
 
 (defn create-gui
@@ -68,14 +94,23 @@
   (doto (JFrame. "Lander")
     (.setContentPane panel)
     (.pack)
-    (.setVisible true)))
+    (.setVisible true)
+    (.addKeyListener (proxy [KeyAdapter] []
+                       (keyPressed [e]
+                         (if (= (.getKeyCode e) KeyEvent/VK_SPACE)
+                           (swap! state assoc-in [:lander :thrust] true)))
+                       (keyReleased [e]
+                         (if (= (.getKeyCode e) KeyEvent/VK_SPACE)
+                           (swap! state assoc-in [:lander :thrust] false)))))))
 
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
+    ;; (println @state)
     (update-state)
     (.repaint panel)
-    (Thread/sleep (- (+ time-step start-time)
-                     (System/currentTimeMillis)))
+    (Thread/sleep (max 0
+                       (- (+ time-step start-time)
+                          (System/currentTimeMillis))))
     (recur)))
 
 
