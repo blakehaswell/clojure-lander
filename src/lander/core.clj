@@ -1,6 +1,7 @@
 (ns lander.core
   (:gen-class)
-  (:import (javax.swing JFrame)))
+  (:import (javax.swing JFrame JPanel)
+           (java.awt Dimension)))
 
 ;; This is how often the world is updated and rendered. We'll be aiming for 60
 ;; frames per second (approx 16ms time-step).
@@ -26,11 +27,20 @@
   [initial-speed acceleration time]
   (+ initial-speed (* acceleration time)))
 
+(defn render [g]
+  (doto g
+    (.fillRect 0 0 100 100))
+  )
+
 (defn create-gui
   []
-  (doto (JFrame. "Lander")
-    (.setSize 640 480)
-    (.setVisible true)))
+  (let [panel (doto (proxy [JPanel] []
+                      (paintComponent [g] (render g)))
+                (.setPreferredSize (Dimension. 640 480)))]
+    (doto (JFrame. "Lander")
+      (.setContentPane panel)
+      (.pack)
+      (.setVisible true))))
 
 (defn -main
   "I don't do a whole lot ... yet."
