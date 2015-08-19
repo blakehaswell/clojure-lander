@@ -1,7 +1,7 @@
 (ns lander.core
   (:gen-class)
   (:import (javax.swing JFrame JPanel)
-           (java.awt Dimension)))
+           (java.awt Dimension Rectangle)))
 
 ;; This is how often the world is updated and rendered. We'll be aiming for 60
 ;; frames per second (approx 16ms time-step).
@@ -14,12 +14,13 @@
 ;; Rotation speed defined in degrees per second.
 (def rotation-speed 90)
 
-(def lander {:x 50 ; x and y coordinates defined in meters.
-             :y 50
-             :thrust true
-             :rotation 20
-             :vertical-speed -10
-             :horizontal-speed 2.4})
+(def state (atom {:lander {:x 50 ; x and y coordinates defined in meters.
+                           :y 50
+                           :thrust true
+                           :fuel 100 ; litres
+                           :rotation 20
+                           :vertical-speed -10
+                           :horizontal-speed 2.4}}))
 
 (defn final-speed
   "Calculates a body's final speed (m/s), given an initial speed (m/s)
@@ -27,20 +28,32 @@
   [initial-speed acceleration time]
   (+ initial-speed (* acceleration time)))
 
-(defn render [g]
+(defn render-lander [g lander]
   (doto g
-    (.fillRect 0 0 100 100))
-  )
+    (.fillRect (:x lander) (:y lander) 100 100)))
+
+(defn render [g]
+  (let [state @state]
+    (render-lander g (:lander state))))
+
+(def panel (doto (proxy [JPanel] []
+                   (paintComponent [g] (render g)))
+             (.setPreferredSize (Dimension. 640 480))))
 
 (defn create-gui
   []
-  (let [panel (doto (proxy [JPanel] []
-                      (paintComponent [g] (render g)))
-                (.setPreferredSize (Dimension. 640 480)))]
-    (doto (JFrame. "Lander")
-      (.setContentPane panel)
-      (.pack)
-      (.setVisible true))))
+  (doto (JFrame. "Lander")
+    (.setContentPane panel)
+    (.pack)
+    (.setVisible true)))
+
+(defn start-loop []
+  (let [start-time (System/currentTimeMillis)]
+    (println start-time)
+    (Thread/sleep (- (+ 500 start-time)
+                     (System/currentTimeMillis)))
+    (recur)))
+
 
 (defn -main
   "I don't do a whole lot ... yet."
