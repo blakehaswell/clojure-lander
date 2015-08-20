@@ -1,7 +1,7 @@
 (ns lander.core
   (:gen-class)
   (:import (javax.swing JFrame JPanel)
-           (java.awt Dimension Rectangle)
+           (java.awt Dimension Polygon Rectangle)
            (java.awt.event KeyAdapter KeyEvent)))
 
 ;; This is how often the world is updated and rendered. We'll be aiming for 60
@@ -15,8 +15,8 @@
 ;; Rotation speed defined in degrees per second.
 (def rotation-speed 90)
 
-(def state (atom {:lander {:x 0 ; x and y coordinates defined in meters.
-                           :y 0
+(def state (atom {:lander {:x 30 ; x and y coordinates defined in meters.
+                           :y 270
                            :thrust false
                            :rotate-cw false
                            :rotate-ccw false
@@ -87,27 +87,49 @@
 (defn pixels
   "Converts meters to pixels."
   [meters]
-  (* meters 5))
+  (* meters 1))
+
+(defn translate-y-pixel [y]
+  (+ 300
+     (* y -1)))
+
+(def level (repeat 400 30))
+
+(defn render-level [g]
+  (let [c (count level)
+        xs (concat
+            (map pixels (range c))
+            [(- (pixels c) 1) 0])
+        ys (concat (map pixels level) [0 0])
+        points (map #(hash-map :x %1 :y %2) xs ys)
+        p (Polygon.)]
+    (doseq [{:keys [x y]} points]
+      (.addPoint p x (translate-y-pixel y)))
+    (doto g
+      (.fill p))))
 
 (defn render-lander [g lander]
-  (let [x (pixels (:x lander))
-        y (- 0 (pixels (:y lander)))]
+  (let [width (pixels 3)
+        height (pixels 4)
+        x (pixels (:x lander))
+        y (translate-y-pixel (pixels (:y lander)))]
     (doto g
       (.rotate
        (Math/toRadians (:rotation lander))
-       (+ x 10)
-       (+ y 10))
-      (.fillRect x y 20 20))))
+       (+ x (/ height 2))
+       (+ y (/ width 2)))
+      (.fillRect x y width height))))
   
 (defn render [g]
   (let [state @state]
+    (render-level g)
     (render-lander g (:lander state))))
 
 (def panel (doto (proxy [JPanel] []
                    (paintComponent [g]
                      (proxy-super paintComponent g)
                      (render g)))
-             (.setPreferredSize (Dimension. 640 480))))
+             (.setPreferredSize (Dimension. 400 300))))
 
 (defn lander-control-listener
   [control key]
