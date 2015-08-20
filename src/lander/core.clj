@@ -9,8 +9,8 @@
 (def time-step (/ 1000 60))
 
 ;; Accelerations in m/s^2.
-(def gravity-acceleration 9.8)
-(def thrust-acceleration 20)
+(def gravity-acceleration -1.6)
+(def thrust-acceleration 16)
 
 ;; Rotation speed defined in degrees per second.
 (def rotation-speed 90)
@@ -25,124 +25,80 @@
                            :vertical-speed 0
                            :horizontal-speed 0}}))
 
-(defn final-speed
-  "Calculates a body's final speed (m/s), given an initial speed (m/s)
-  and a constant acceleration (m/s^2) which is applied for time (s)."
-  [initial-speed acceleration time]
-  (+ initial-speed (* acceleration time)))
-
-(defn apply-cw-rotation
-  [state]
-  (if (:rotate-cw (:lander state))
-    (update-in state [:lander :rotation]
-               (fn [rotation] (mod (+ rotation
-                                      (* rotation-speed
-                                         (/ time-step 1000)))
-                                   360)))
-    state))
-
-(defn apply-ccw-rotation
-  [state]
-  (if (:rotate-ccw (:lander state))
-    (update-in state [:lander :rotation]
-               (fn [rotation] (mod (- rotation
-                                      (* rotation-speed
-                                         (/ time-step 1000)))
-                                   360)))
-    state))
-
-(defn update-rotation
-  [state]
-  (-> state
-      apply-cw-rotation
-      apply-ccw-rotation))
-
-(defn apply-gravity
-  [state]
-  (update-in state
-             [:lander :vertical-speed]
-             (fn [vertical-speed] (final-speed vertical-speed
-                                               (* gravity -1)
-                                               (/ time-step 1000)))))
-
-(defn horizontal-thrust-percentage
-  [rotation]
-  (* -1 (/ (rem (- (rem rotation 360) 180) 180) 90)))
-
-(defn vertical-thrust-percentage
-  [rotation]
-  (* -1 (/ (rem (- (rem (+ rotation 90) 360) 180) 180) 90)))
-
-(defn apply-thrust
-  [state]
-  (if (:thrust (:lander state))
-    (update-in state [:lander]
-               (fn [lander]
-                 (-> lander
-                     (update-in [:vertical-speed]
-                                (fn [vertical-speed]
-                                  (final-speed vertical-speed
-                                               (* thrust-acceleration
-                                                  (vertical-thrust-percentage (:rotation lander)))
-                                               (/ time-step 1000))))
-                     (update-in [:horizontal-speed]
-                                (fn [horizontal-speed]
-                                  (final-speed horizontal-speed
-                                               (* thrust-acceleration
-                                                  (* -1 (horizontal-thrust-percentage (:rotation lander))))
-                                               (/ time-step 1000)))))))
-    state))
-
-(defn update-speed
-  [state]
-  (-> state
-      apply-gravity
-      apply-thrust))
-
-(defn update-position
-  [state]
-  (update-in state
-             [:lander]
-             (fn [lander]
-               (assoc lander
-                      :y (- (:y lander)
-                            (* (:vertical-speed lander)
-                               (/ time-step 1000)))
-                      :x (- (:x lander)
-                            (* (:horizontal-speed lander)
-                               (/ time-step 1000)))))))
-
 (defn update-state []
   (swap! state (fn [s]
-                 (-> s
-                     update-rotation
-                     update-speed
-                     update-position))))
+                 (let [lander (:lander s)
+                       x (:x lander)
+                       y (:y lander)
+                       q (cond (>= (:rotation lander) 270) 4
+                               (>= (:rotation lander) 180) 3
+                               (>= (:rotation lander) 90) 2
+                               :else 1)
+                       xdir (if (or (= q 1)
+                                    (= q 2))
+                              1
+                              -1)
+                       ydir (if (or (= q 1)
+                                    (= q 4))
+                              1
+                              -1)
+                       r (Math/toRadians
+                          (if (or (= q 2)
+                                  (= q 4))
+                            (- 90
+                               (mod (:rotation lander) 90))
+                            (mod (:rotation lander) 90)))
+                       a (if (:thrust lander)
+                           thrust-acceleration
+                           0)
+                       dt (/ time-step 1000)
+                       ax (* a
+                             (Math/sin r)
+                             xdir)
+                       ay (+ (* a
+                                (Math/cos r)
+                                ydir)
+                             gravity-acceleration)
+                       vx (:horizontal-speed lander)
+                       vy (:vertical-speed lander)
+                       rd (* rotation-speed dt)
+                       final-speed (fn [a v] (+ (* a dt) v))
+                       final-position (fn [p v a]
+                                        (+ p
+                                           (* v dt)
+                                           (/ (* a (* dt dt))
+                                              2)))]
+                   (update-in s [:lander] merge
+                              {:horizontal-speed (final-speed ax vx)
+                               :vertical-speed (final-speed ay vy)
+                               :x (final-position x vx ax)
+                               :y (final-position y vy ay)
+                               :rotation (mod (+ (:rotation lander)
+                                                 (if (:rotate-cw lander)
+                                                   rd
+                                                   0)
+                                                 (if (:rotate-ccw lander)
+                                                   (* rd -1)
+                                                   0))
+                                              360)})))))
 
 ;; UI ;;
 
 (defn pixels
   "Converts meters to pixels."
   [meters]
-  (* meters 10))
-
-(defn radians
-  "Converts degrees to radians."
-  [degrees]
-  (* degrees
-     (/ Math/PI 180)))
+  (* meters 5))
 
 (defn render-lander [g lander]
   (let [x (pixels (:x lander))
-        y (pixels (:y lander))]
+        y (- 0 (pixels (:y lander)))]
     (doto g
       (.rotate
-       (radians (:rotation lander))
-       (+ x 50)
-       (+ y 50))
-      (.fillRect x y 100 100))))
+       (Math/toRadians (:rotation lander))
+       (+ x 10)
+       (+ y 10))
+      (.fillRect x y 20 20))))
   
-
 (defn render [g]
   (let [state @state]
     (render-lander g (:lander state))))
@@ -189,7 +145,7 @@
 
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
-    ;; (println @state)
+    ;(println @state)
     (update-state)
     (.repaint panel)
     (Thread/sleep (max 0
