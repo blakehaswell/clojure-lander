@@ -43,11 +43,11 @@
                               1
                               -1)
                        r (Math/toRadians
-                          (if (or (= q 2)
-                                  (= q 4))
-                            (- 90
-                               (mod (:rotation lander) 90))
-                            (mod (:rotation lander) 90)))
+                          (let [mr (mod (:rotation lander) 90)]
+                            (if (or (= q 2)
+                                    (= q 4))
+                              (- 90 mr)
+                              mr)))
                        a (if (:thrust lander)
                            thrust-acceleration
                            0)
