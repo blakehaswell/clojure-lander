@@ -109,17 +109,16 @@
                      (render g)))
              (.setPreferredSize (Dimension. 640 480))))
 
-(defn thrust-key?
-  [event]
-  (= (.getKeyCode event) KeyEvent/VK_SPACE))
-
-(defn rotate-cc-key?
-  [event]
-  (= (.getKeyCode event) KeyEvent/VK_RIGHT))
-
-(defn rotate-ccw-key?
-  [event]
-  (= (.getKeyCode event) KeyEvent/VK_LEFT))
+(defn lander-control-listener
+  [control key]
+  (let [is-key? (fn [event] (= (.getKeyCode event) key))]
+    (proxy [KeyAdapter] []
+    (keyPressed [event]
+      (if (is-key? event)
+        (swap! state assoc-in [:lander control] true)))
+    (keyReleased [event]
+      (if (is-key? event)
+        (swap! state assoc-in [:lander control] false))))))
 
 (defn create-gui
   []
@@ -127,21 +126,9 @@
     (.setContentPane panel)
     (.pack)
     (.setVisible true)
-    (.addKeyListener (proxy [KeyAdapter] []
-                       (keyPressed [event]
-                         (if (thrust-key? event)
-                           (swap! state assoc-in [:lander :thrust] true))
-                         (if (rotate-cc-key? event)
-                           (swap! state assoc-in [:lander :rotate-cw] true))
-                         (if (rotate-ccw-key? event)
-                           (swap! state assoc-in [:lander :rotate-ccw] true)))
-                       (keyReleased [event]
-                         (if (thrust-key? event)
-                           (swap! state assoc-in [:lander :thrust] false))
-                         (if (rotate-cc-key? event)
-                           (swap! state assoc-in [:lander :rotate-cw] false))
-                         (if (rotate-ccw-key? event)
-                           (swap! state assoc-in [:lander :rotate-ccw] false)))))))
+    (.addKeyListener (lander-control-listener :thrust KeyEvent/VK_SPACE))
+    (.addKeyListener (lander-control-listener :rotate-cw KeyEvent/VK_RIGHT))
+    (.addKeyListener (lander-control-listener :rotate-ccw KeyEvent/VK_LEFT))))
 
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
