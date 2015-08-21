@@ -120,22 +120,19 @@
            d 125
            count 9]
       (if (= 0 count)
-        (sort
-         #(- (:x %1) (:x %2))
-         (reduce (fn [points line]
-                   (conj points
-                         {:x (:x1 line)
-                          :y (:y1 line)}
-                         {:x (:x2 line)
-                          :y (:y2 line)}))
-                 #{}
-                 lines))
+        (conj (map (fn [line]
+                     {:x (:x2 line)
+                      :y (:y2 line)})
+                   lines)
+              (let [line (first lines)]
+                {:x (:x1 line)
+                 :y (:y1 line)}))
         (recur (reduce
                 concat
                 (map
                  (partial split-line d)
                  lines))
-               (* d 0.6)
+               (* d 0.4)
                (- count 1))))))
 
 (def level (generate-level))
@@ -147,7 +144,7 @@
        p
        (pixels x)
        (translate-y-pixel (pixels y))))
-    (.addPoint p (pixels 511) (translate-y-pixel (pixels 0)))
+    (.addPoint p (pixels 512) (translate-y-pixel (pixels 0)))
     (.addPoint p (pixels 0) (translate-y-pixel (pixels 0)))
     (doto g
       (.fill p))))
