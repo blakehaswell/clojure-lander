@@ -8,6 +8,9 @@
 ;; frames per second (approx 16ms time-step).
 (def time-step (/ 1000 60))
 
+(def world-width 512)
+(def world-height 384)
+
 ;; Accelerations in m/s^2.
 (def gravity-acceleration -1.6)
 (def thrust-acceleration 16)
@@ -84,13 +87,16 @@
 
 ;; UI ;;
 
+(def screen-width 1024)
+(def screen-height 768)
+
 (defn pixels
   "Converts meters to pixels."
   [meters]
-  (* meters 1))
+  (* meters (/ screen-width world-width)))
 
 (defn translate-y-pixel [y]
-  (+ 384
+  (+ screen-height
      (* y -1)))
 
 (defn average
@@ -144,8 +150,8 @@
        p
        (pixels x)
        (translate-y-pixel (pixels y))))
-    (.addPoint p (pixels 512) (translate-y-pixel (pixels 0)))
-    (.addPoint p (pixels 0) (translate-y-pixel (pixels 0)))
+    (.addPoint p screen-width screen-height)
+    (.addPoint p 0 screen-height)
     (doto g
       (.fill p))))
 
@@ -170,7 +176,7 @@
                    (paintComponent [g]
                      (proxy-super paintComponent g)
                      (render g)))
-             (.setPreferredSize (Dimension. 512 384))))
+             (.setPreferredSize (Dimension. screen-width screen-height))))
 
 (defn lander-control-listener
   [control key]
