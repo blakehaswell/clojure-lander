@@ -90,21 +90,65 @@
   (* meters 1))
 
 (defn translate-y-pixel [y]
-  (+ 300
+  (+ 384
      (* y -1)))
 
-(def level (repeat 400 30))
+(defn average
+  [& ns]
+  (/ (reduce + ns)
+     (count ns)))
+
+(defn split-line
+  [d {:keys [x1 y1 x2 y2]}]
+  (let [xm (average x1 x2)
+        ;; r is a random number between -1 and 1.
+        r (- (rand 2)  1)
+        ym (+ (average y1 y2)
+              (* r d))]
+    [{:x1 x1 :y1 y1 :x2 xm :y2 ym}
+     {:x1 xm :y1 ym :x2 x2 :y2 y2}]))
+
+(defn generate-level
+  []
+  ;; r is somewhere between 30 and 300.
+  (let [r (+ (* (rand) 270) 30)]
+    (print r)
+    (loop [lines [{:x1 0
+                   :y1 r
+                   :x2 512
+                   :y2 (- 300 r)}]
+           d 125
+           count 9]
+      (if (= 0 count)
+        (sort
+         #(- (:x %1) (:x %2))
+         (reduce (fn [points line]
+                   (conj points
+                         {:x (:x1 line)
+                          :y (:y1 line)}
+                         {:x (:x2 line)
+                          :y (:y2 line)}))
+                 #{}
+                 lines))
+        (recur (reduce
+                concat
+                (map
+                 (partial split-line d)
+                 lines))
+               (* d 0.6)
+               (- count 1))))))
+
+(def level (generate-level))
 
 (defn render-level [g]
-  (let [c (count level)
-        xs (concat
-            (map pixels (range c))
-            [(- (pixels c) 1) 0])
-        ys (concat (map pixels level) [0 0])
-        points (map #(hash-map :x %1 :y %2) xs ys)
-        p (Polygon.)]
-    (doseq [{:keys [x y]} points]
-      (.addPoint p x (translate-y-pixel y)))
+  (let [p (Polygon.)]
+    (doseq [{:keys [x y]} level]
+      (.addPoint
+       p
+       (pixels x)
+       (translate-y-pixel (pixels y))))
+    (.addPoint p (pixels 511) (translate-y-pixel (pixels 0)))
+    (.addPoint p (pixels 0) (translate-y-pixel (pixels 0)))
     (doto g
       (.fill p))))
 
@@ -129,7 +173,7 @@
                    (paintComponent [g]
                      (proxy-super paintComponent g)
                      (render g)))
-             (.setPreferredSize (Dimension. 400 300))))
+             (.setPreferredSize (Dimension. 512 384))))
 
 (defn lander-control-listener
   [control key]
