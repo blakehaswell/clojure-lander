@@ -137,11 +137,7 @@
               (let [line (first lines)]
                 {:x (:x1 line)
                  :y (:y1 line)}))
-        (recur (reduce
-                concat
-                (map
-                 (partial split-line d)
-                 lines))
+        (recur (mapcat (partial split-line d) lines)
                (* d 0.4)
                (- count 1))))))
 
