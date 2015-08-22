@@ -8,8 +8,8 @@
 ;; frames per second (approx 16ms time-step).
 (def time-step (/ 1000 60))
 
-(def world-width 512)
-(def world-height 384)
+(def world-width 256)
+(def world-height 192)
 
 ;; Accelerations in m/s^2.
 (def gravity-acceleration -1.6)
@@ -19,7 +19,7 @@
 (def rotation-speed 90)
 
 (def state (atom {:lander {:x 30 ; x and y coordinates defined in meters.
-                           :y 270
+                           :y 162
                            :thrust false
                            :rotate-cw false
                            :rotate-ccw false
@@ -87,17 +87,20 @@
 
 ;; UI ;;
 
-(def screen-width 1024)
-(def screen-height 768)
+(def screen-width 512)
+(def screen-height 384)
 
-(defn pixels
+(defn to-pixels
   "Converts meters to pixels."
   [meters]
   (* meters (/ screen-width world-width)))
 
-(defn translate-y-pixel [y]
-  (+ screen-height
-     (* y -1)))
+(defn to-screen-coords
+  "Converts co-ordinates defined in meters into on-screen co-ordinates."
+  [{:keys [x y]}]
+  {:x (to-pixels x)
+   :y (+ screen-height
+         (* (to-pixels y) -1))})
 
 (defn average
   [& ns]
@@ -116,15 +119,16 @@
 
 (defn generate-level
   []
-  ;; r is somewhere between 30 and 300.
-  (let [r (+ (* (rand) 270) 30)]
+  ;; r is somewhere between 30 and 150.
+  (let [r (+ (* (rand) 120) 30)]
     (print r)
     (loop [lines [{:x1 0
                    :y1 r
-                   :x2 512
-                   :y2 (- 300 r)}]
+                   :x2 256
+                   :y2 (- 150 r)}]
            d 125
-           count 9]
+           ;; Looping 8 times gives us 256 lines.
+           count 8]
       (if (= 0 count)
         (conj (map (fn [line]
                      {:x (:x2 line)
@@ -145,21 +149,18 @@
 
 (defn render-level [g]
   (let [p (Polygon.)]
-    (doseq [{:keys [x y]} level]
-      (.addPoint
-       p
-       (pixels x)
-       (translate-y-pixel (pixels y))))
-    (.addPoint p screen-width screen-height)
-    (.addPoint p 0 screen-height)
-    (doto g
-      (.fill p))))
+    (doseq [point level]
+      (let [{:keys [x y]} (to-screen-coords point)]
+        (.addPoint p x y)))
+    (doto p
+      (.addPoint screen-width screen-height)
+      (.addPoint 0 screen-height))
+    (.fill g p)))
 
 (defn render-lander [g lander]
-  (let [width (pixels 3)
-        height (pixels 4)
-        x (pixels (:x lander))
-        y (translate-y-pixel (pixels (:y lander)))]
+  (let [width (to-pixels 3)
+        height (to-pixels 4)
+        {:keys [x y]} (to-screen-coords lander)]
     (doto g
       (.rotate
        (Math/toRadians (:rotation lander))
