@@ -18,6 +18,64 @@
 ;; Rotation speed defined in degrees per second.
 (def rotation-speed 90)
 
+(defn update-lander
+  [lander]
+  (let [x (:x lander)
+        y (:y lander)
+        q (cond (>= (:rotation lander) 270) 4
+                (>= (:rotation lander) 180) 3
+                (>= (:rotation lander) 90) 2
+                :else 1)
+        xdir (if (or (= q 1)
+                     (= q 2))
+               1
+               -1)
+        ydir (if (or (= q 1)
+                     (= q 4))
+               1
+               -1)
+        r (Math/toRadians
+           (let [mr (mod (:rotation lander) 90)]
+             (if (or (= q 2)
+                     (= q 4))
+               (- 90 mr)
+               mr)))
+        a (if (:thrust lander)
+            thrust-acceleration
+            0)
+        dt (/ time-step 1000)
+        ax (* a
+              (Math/sin r)
+              xdir)
+        ay (+ (* a
+                 (Math/cos r)
+                 ydir)
+              gravity-acceleration)
+        vx (:horizontal-speed lander)
+        vy (:vertical-speed lander)
+        rd (* rotation-speed dt)
+        final-speed (fn [a v] (+ (* a dt) v))
+        final-position (fn [p v a]
+                         (+ p
+                            (* v dt)
+                            (/ (* a (* dt dt))
+                               2)))]
+    (merge lander
+           {:horizontal-speed (final-speed ax vx)
+            :vertical-speed (final-speed ay vy)
+            :x (final-position x vx ax)
+            :y (final-position y vy ay)
+            :rotation (mod (+ (:rotation lander)
+                              (if (:rotate-cw lander)
+                                rd
+                                0)
+                              (if (:rotate-ccw lander)
+                                (* rd -1)
+                                0))
+                           360)})))
+
+;; State ;;
+
 (def state (atom {:lander {:x 30 ; x and y coordinates defined in meters.
                            :y 162
                            :thrust false
@@ -29,61 +87,7 @@
                            :horizontal-speed 0}}))
 
 (defn update-state []
-  (swap! state (fn [s]
-                 (let [lander (:lander s)
-                       x (:x lander)
-                       y (:y lander)
-                       q (cond (>= (:rotation lander) 270) 4
-                               (>= (:rotation lander) 180) 3
-                               (>= (:rotation lander) 90) 2
-                               :else 1)
-                       xdir (if (or (= q 1)
-                                    (= q 2))
-                              1
-                              -1)
-                       ydir (if (or (= q 1)
-                                    (= q 4))
-                              1
-                              -1)
-                       r (Math/toRadians
-                          (let [mr (mod (:rotation lander) 90)]
-                            (if (or (= q 2)
-                                    (= q 4))
-                              (- 90 mr)
-                              mr)))
-                       a (if (:thrust lander)
-                           thrust-acceleration
-                           0)
-                       dt (/ time-step 1000)
-                       ax (* a
-                             (Math/sin r)
-                             xdir)
-                       ay (+ (* a
-                                (Math/cos r)
-                                ydir)
-                             gravity-acceleration)
-                       vx (:horizontal-speed lander)
-                       vy (:vertical-speed lander)
-                       rd (* rotation-speed dt)
-                       final-speed (fn [a v] (+ (* a dt) v))
-                       final-position (fn [p v a]
-                                        (+ p
-                                           (* v dt)
-                                           (/ (* a (* dt dt))
-                                              2)))]
-                   (update-in s [:lander] merge
-                              {:horizontal-speed (final-speed ax vx)
-                               :vertical-speed (final-speed ay vy)
-                               :x (final-position x vx ax)
-                               :y (final-position y vy ay)
-                               :rotation (mod (+ (:rotation lander)
-                                                 (if (:rotate-cw lander)
-                                                   rd
-                                                   0)
-                                                 (if (:rotate-ccw lander)
-                                                   (* rd -1)
-                                                   0))
-                                              360)})))))
+  (swap! state update-in [:lander] update-lander))
 
 ;; UI ;;
 
