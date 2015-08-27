@@ -11,6 +11,36 @@
 (def world-width 256)
 (def world-height 192)
 
+(defmulti update-game-state :game-state)
+
+(defmethod update-game-state :playing
+  [{{lx :x ly :y vx :horizontal-speed vy :vertical-speed} :lander
+    :as state}]
+  (let [_lx (if (integer? lx) lx (Math/round lx))
+        gy (->> level
+                (filter (comp (partial = _lx) :x))
+                first
+                :y)]
+    (if (<= ly gy)
+      (update-in state [:game-state] (fn [_] (if (and (<= vx 10)
+                                                      (<= vy 10))
+                                               :landed
+                                               :crashed)))
+      
+      state)))
+
+(defmethod update-game-state :default [state] state)
+
+(defmulti start-game :game-state)
+
+(defmethod start-game :landed
+  [state]
+  (new-level state))
+
+(defmethod start-game :crashed
+  [state]
+  (new-game state))
+
 ;; Accelerations in m/s^2.
 (def gravity-acceleration -1.6)
 (def thrust-acceleration 16)
@@ -74,9 +104,32 @@
                                 0))
                            360)})))
 
+(defn new-level
+  [state]
+  (-> state
+      (assoc-in [:level] (generate-level))
+      (assoc-in [:lander] (merge (:lander state) {:x 30
+                                                  :y 162
+                                                  :rotation 0
+                                                  :vertical-speed 0
+                                                  :horizontal-speed 0}))))
+
+;; TODO: Other stuff like resetting scores and timers and so on.
+(defn new-game
+  [state]
+  (-> state
+      (new-level)
+      (assoc-in [:lander] (merge (:lander state) {:fuel 100}))))
+
+(defn init-game
+  []
+  (-> {:game-state :init}
+      (new-game)))
+
 ;; State ;;
 
-(def state (atom {:lander {:x 30 ; x and y coordinates defined in meters.
+(def state (atom {:game-state :playing
+                  :lander {:x 30 ; x and y coordinates defined in meters.
                            :y 162
                            :thrust false
                            :rotate-cw false
@@ -87,7 +140,8 @@
                            :horizontal-speed 0}}))
 
 (defn update-state []
-  (swap! state update-in [:lander] update-lander))
+  (swap! state update-in [:lander] update-lander)
+  (swap! state update-game-state))
 
 ;; UI ;;
 
