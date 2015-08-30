@@ -11,16 +11,42 @@
 (def world-width 256)
 (def world-height 192)
 
+(defn new-level
+  [state]
+  (-> state
+      (assoc-in [:game-state] :playing)
+      (assoc-in [:level] (generate-level))
+      (assoc-in [:lander] (merge (:lander state) {:x 30
+                                                  :y 162
+                                                  :rotation 0
+                                                  :vertical-speed 0
+                                                  :horizontal-speed 0}))))
+
+;; TODO: Other stuff like resetting scores and timers and so on.
+(defn new-game
+  [state]
+  (-> state
+      new-level
+      (update-in [:lander] #(merge % {:fuel 100}))))
+
+(defn init-game
+  []
+  (-> {}
+      (new-game)
+      (assoc-in [:game-state] :init)))
+
 (defmulti update-game-state :game-state)
 
 (defmethod update-game-state :playing
   [{{lx :x ly :y vx :horizontal-speed vy :vertical-speed} :lander
+    level :level
     :as state}]
   (let [_lx (if (integer? lx) lx (Math/round lx))
         gy (->> level
                 (filter (comp (partial = _lx) :x))
                 first
                 :y)]
+    (println ly gy vx vy)
     (if (<= ly gy)
       (update-in state [:game-state] (fn [_] (if (and (<= vx 10)
                                                       (<= vy 10))
@@ -40,6 +66,12 @@
 (defmethod start-game :crashed
   [state]
   (new-game state))
+
+(defmethod start-game :init
+  [state]
+  (assoc-in state [:game-state] :playing))
+
+(defmethod start-game :default [state] state)
 
 ;; Accelerations in m/s^2.
 (def gravity-acceleration -1.6)
@@ -104,44 +136,28 @@
                                 0))
                            360)})))
 
-(defn new-level
-  [state]
-  (-> state
-      (assoc-in [:level] (generate-level))
-      (assoc-in [:lander] (merge (:lander state) {:x 30
-                                                  :y 162
-                                                  :rotation 0
-                                                  :vertical-speed 0
-                                                  :horizontal-speed 0}))))
+(defmulti update-physics :game-state)
 
-;; TODO: Other stuff like resetting scores and timers and so on.
-(defn new-game
+(defmethod update-physics :playing
   [state]
-  (-> state
-      (new-level)
-      (assoc-in [:lander] (merge (:lander state) {:fuel 100}))))
+  (update-in state [:lander] update-lander))
 
-(defn init-game
-  []
-  (-> {:game-state :init}
-      (new-game)))
+(defmethod update-physics :default [state] state)
 
 ;; State ;;
 
-(def state (atom {:game-state :playing
-                  :lander {:x 30 ; x and y coordinates defined in meters.
-                           :y 162
-                           :thrust false
-                           :rotate-cw false
-                           :rotate-ccw false
-                           :fuel 100 ; litres
-                           :rotation 0
-                           :vertical-speed 0
-                           :horizontal-speed 0}}))
+(def state (atom (init-game)))
 
 (defn update-state []
-  (swap! state update-in [:lander] update-lander)
-  (swap! state update-game-state))
+  (swap! state (fn [s] (-> s
+                           update-physics
+                           update-game-state))))
+
+(defn advance-game-state []
+  (println "Advancing game state")
+  (let [game-state (:game-state @state)]
+    (if (not (= :playing game-state))
+      (swap! state start-game))))
 
 ;; UI ;;
 
@@ -199,9 +215,7 @@
                (* d 0.4)
                (- count 1))))))
 
-(def level (generate-level))
-
-(defn render-level [g]
+(defn render-level [g level]
   (let [p (Polygon.)]
     (doseq [point level]
       (let [{:keys [x y]} (to-screen-coords point)]
@@ -211,6 +225,7 @@
       (.addPoint 0 screen-height))
     (.fill g p)))
 
+;; TODO: Render lander with origin in bottom center, not top left.
 (defn render-lander [g lander]
   (let [width (to-pixels 3)
         height (to-pixels 4)
@@ -224,7 +239,7 @@
   
 (defn render [g]
   (let [state @state]
-    (render-level g)
+    (render-level g (:level state))
     (render-lander g (:lander state))))
 
 (def panel (doto (proxy [JPanel] []
@@ -250,13 +265,17 @@
     (.setContentPane panel)
     (.pack)
     (.setVisible true)
+    (.addKeyListener (proxy [KeyAdapter] []
+                       (keyPressed [event]
+                         (if (= (.getKeyCode event) KeyEvent/VK_SPACE)
+                           (advance-game-state)))))
     (.addKeyListener (lander-control-listener :thrust KeyEvent/VK_SPACE))
     (.addKeyListener (lander-control-listener :rotate-cw KeyEvent/VK_RIGHT))
     (.addKeyListener (lander-control-listener :rotate-ccw KeyEvent/VK_LEFT))))
 
 (defn start-loop []
   (let [start-time (System/currentTimeMillis)]
-    ;(println @state)
+    ;(println (:game-state @state))
     (update-state)
     (.repaint panel)
     (Thread/sleep (max 0
@@ -266,6 +285,6 @@
 
 
 (defn -main
-  "I don't do a whole lot ... yet."
   [& args]
-  (println "Hello, World!"))
+  (create-gui)
+  (start-loop))
